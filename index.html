@@ -1,0 +1,204 @@
+<!-- SUPER BAD PROTOTYPE VERSION! -->
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+    <head>
+        <meta charset="utf-8">
+        <title>Complex</title>
+        <style media="screen">
+            @import url('https://fonts.googleapis.com/css?family=Quicksand');
+            * {
+                font-family: 'Quicksand', sans-serif;
+                font-size: 20px;
+            }
+            body {
+                text-align: center;
+                padding: 10px;
+            }
+            input[type='text'] {
+                padding: 10px;
+                background: #eee;
+                border: none;
+                border-radius: 5px;
+                outline: none;
+            }
+            canvas {
+                background: #eee;
+                border-radius: 10px;
+                margin: 10px;
+            }
+        </style>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/5.1.1/math.min.js" charset="utf-8"></script>
+    </head>
+    <body>
+
+        <p>Use your mouse or finger to put some snakes on the plane:</p>
+
+        <canvas></canvas>
+        <p>
+            z(x) = <input type="text" id='func-in' value='-x'>
+        </p>
+
+        <p>
+            Snake colour: <input type="color" id='color' value='#f15689'>
+        </p>
+
+        <script>
+
+            function map(x, inMin, inMax, outMin, outMax) {
+                return (x - inMin) * (outMax - outMin) / (inMax - inMin) + outMin
+            }
+
+            const cvs = document.querySelector('canvas')
+
+            cvs.width = 600
+            cvs.height = 600
+            const ctx = cvs.getContext('2d')
+
+            let scale = 1
+
+            let points = []
+            let transPoints = []
+            let transTargets = []
+            let touching = false
+
+            function transform([x, y]){
+                let out
+                try {
+                    out = math.eval(document.querySelector('#func-in').value, {
+                        x: math.complex(x, y)
+                    })
+                } catch (e) {
+                    return [x, y]
+                }
+                if(out == undefined) return [x, y]
+                if(out.re !== undefined && out.im !== undefined){
+                    return [out.re, out.im]
+                }
+                return [out, 0]
+            }
+
+            cvs.addEventListener('touchstart', e => {
+                e.preventDefault()
+                if(e.target != cvs) return
+                points = []
+                transPoints = []
+                transTargets = []
+                touching = true
+            })
+
+            cvs.addEventListener('mousedown', e => {
+                if(e.target != cvs) return
+                points = []
+                transPoints = []
+                transTargets = []
+                touching = true
+            })
+
+            cvs.addEventListener('touchmove', e => {
+                e.preventDefault()
+                if(e.target != cvs) return
+                let t = null
+                for(const touch of e.touches){
+                    if(touch.target == cvs) t = touch
+                }
+                if(!touching || t == null) return
+                const box = cvs.getBoundingClientRect()
+                const x = t.clientX - box.left
+                const y = t.clientY - box.top
+                points.push([map(x, 0, cvs.width, -scale, scale), map(y, 0, cvs.width, scale, -scale)])
+            })
+
+            cvs.addEventListener('mousemove', e => {
+                if(!touching) return
+                const box = cvs.getBoundingClientRect()
+                const x = e.clientX - box.left
+                const y = e.clientY - box.top
+                points.push([map(x, 0, cvs.width, -scale, scale), map(y, 0, cvs.width, scale, -scale)])
+            })
+
+            cvs.addEventListener('touchend', e => {
+                e.preventDefault()
+                if(e.target != cvs) return
+                touching = false
+                transPoints = points.map(x => [...x])
+                transTargets = points.map(transform)
+            })
+
+            cvs.addEventListener('mouseup', e => {
+                if(e.target != cvs) return
+                touching = false
+                transPoints = points.map(x => [...x])
+                transTargets = points.map(transform)
+            })
+
+            function render(){
+
+                ctx.clearRect(0, 0, cvs.width, cvs.width)
+
+                for(let i = 0; i < transPoints.length; i++){
+                    transPoints[i][0] += (transTargets[i][0] - transPoints[i][0]) * 0.05
+                    transPoints[i][1] += (transTargets[i][1] - transPoints[i][1]) * 0.05
+                }
+
+                ctx.lineWidth = 2
+                ctx.lineCap = 'round'
+                ctx.strokeStyle = '#ddd'
+                ctx.beginPath()
+                ctx.moveTo(0, cvs.width/2)
+                ctx.lineTo(cvs.width, cvs.width/2)
+                ctx.stroke()
+                ctx.beginPath()
+                ctx.moveTo(cvs.width/2, 0)
+                ctx.lineTo(cvs.width/2, cvs.width)
+                ctx.stroke()
+
+                function drawSnake(points, color){
+                    for(let i = 1; i < points.length; i++){
+                        let prev = points[i - 1]
+                        let curr = points[i]
+                        ctx.strokeStyle = color
+                        ctx.lineWidth = Math.round(map(i-1, 0, points.length, 20, 3))
+                        ctx.beginPath()
+                        ctx.moveTo(map(prev[0], -scale, scale, 0, cvs.width), map(prev[1], scale, -scale, 0, cvs.width))
+                        ctx.lineTo(map(curr[0], -scale, scale, 0, cvs.width), map(curr[1], scale, -scale, 0, cvs.width))
+                        ctx.stroke()
+                    }
+
+                    if(points.length < 2) return
+                    let startPoint = points[0].map(x => map(x, -scale, scale, 0, cvs.width))
+                    let secondPoint = points[1].map(x => map(x, -scale, scale, 0, cvs.width))
+                    startPoint[1] = cvs.width - startPoint[1]
+                    secondPoint[1] = cvs.width - secondPoint[1]
+                    const dx = secondPoint[0] - startPoint[0]
+                    const dy = secondPoint[1] - startPoint[1]
+                    const ang = -Math.atan2(dy, dx)
+                    const tang = Math.atan2(dy, dx)
+                    ctx.lineWidth = 3
+                    ctx.beginPath()
+                    let len = 15
+                    let tipX = startPoint[0] - Math.cos(tang) * len
+                    let tipY =  startPoint[1] - Math.sin(tang) * len
+                    ctx.moveTo(startPoint[0], startPoint[1])
+                    ctx.lineTo(tipX, tipY)
+                    ctx.moveTo(tipX, tipY)
+                    ctx.lineTo(tipX - Math.cos(tang-0.5) * len/2, tipY - Math.sin(tang-0.5) * len/2)
+                    ctx.moveTo(tipX, tipY)
+                    ctx.lineTo(tipX - Math.cos(tang+0.5) * len/2, tipY - Math.sin(tang+0.5) * len/2)
+                    ctx.stroke()
+                    ctx.fillStyle = '#fff'
+                    ctx.beginPath()
+                    ctx.arc(startPoint[0] + Math.sin(ang) * 5, startPoint[1] + Math.cos(ang) * 5, 4, 0, Math.PI * 2)
+                    ctx.arc(startPoint[0] - Math.sin(ang) * 5, startPoint[1] - Math.cos(ang) * 5, 4, 0, Math.PI * 2)
+                    ctx.fill()
+                }
+
+                drawSnake(points, '#333')
+                drawSnake(transPoints, document.querySelector('#color').value)
+
+                requestAnimationFrame(render)
+            }
+            render()
+
+        </script>
+    </body>
+</html>
