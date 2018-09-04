@@ -2,8 +2,6 @@
 
 (Very early prototype version)
 
----
-
 > So... Snakes on a plane... But it's the complex plane...
 
 This is just a little toy I built to help myself understand complex functions!
