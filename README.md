@@ -1,6 +1,6 @@
 # Snakes On A *(Complex)* Plane!
 
-(Very early prototype version)
+(Early prototype version)
 
 > So... Snakes on a plane... But it's the complex plane...
 

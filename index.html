@@ -1,4 +1,4 @@
-<!-- SUPER BAD PROTOTYPE VERSION! -->
+<!-- SEMI-BAD PROTOTYPE VERSION! -->
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
     <head>
@@ -8,39 +8,118 @@
             @import url('https://fonts.googleapis.com/css?family=Quicksand');
             * {
                 font-family: 'Quicksand', sans-serif;
-                font-size: 20px;
+                outline: none; /* Sorry :( */
+                    box-sizing: border-box;
             }
+
             body {
                 text-align: center;
-                padding: 10px;
             }
-            input[type='text'] {
-                padding: 10px;
+
+            .app {
+                display: inline-grid;
+                text-align: left;
+                grid-template-columns: auto 1fr;
+                grid-template-areas: "edit canvas";
+            }
+
+            p, input {
+                font-size: 20px;
+            }
+
+            input[type='color'], input[type='checkbox']{
+                width: 40px;
+                height: 40px;
+            }
+
+            input[type='text']{
+                padding: 5px 10px;
                 background: #eee;
                 border: none;
                 border-radius: 5px;
-                outline: none;
             }
+
+            input[type='range']{
+                width: 250px;
+            }
+
+            .app > * {
+                padding: 20px;
+            }
+
             canvas {
                 background: #eee;
                 border-radius: 10px;
-                margin: 10px;
             }
+
+            td {
+                padding: 10px;
+            }
+
+            .canvas-side {
+                text-align: right;
+            }
+
+            .canvas-side p {
+                opacity: 0.5;
+            }
+
+            h1 {
+                border-bottom: 1px solid #000;
+                padding-bottom: 10px;
+            }
+
         </style>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/5.1.1/math.min.js" charset="utf-8"></script>
     </head>
     <body>
 
-        <p>Use your mouse or finger to put some snakes on the plane:</p>
+        <div class="app">
+            <div class="edit">
+                <h1>Snakes On A (Complex) Plane</h1>
+                <table>
+                    <tbody>
+                        <tr>
+                            <td>
+                                z(x) =
+                            </td>
+                            <td>
+                                <input type="text" id='func-in' value='-x'>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                Scale:
+                            </td>
+                            <td>
+                                <input type="range" value='2' min='1' max='10' step='0.01' id='scale'>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <a href="https://www.youtube.com/watch?v=b7FxPsqfkOY" target="_blank">Hue winding</a>:
+                            </td>
+                            <td>
+                                <input type="checkbox" id='winding' checked='true'>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                Z colour:
+                            </td>
+                            <td>
+                                <input type="color" id='color' value='#777777'>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="canvas-side">
+                <p>Use your mouse or finger to put some snakes on the plane:</p>
+                <canvas></canvas>
+            </div>
+        </div>
 
-        <canvas></canvas>
-        <p>
-            z(x) = <input type="text" id='func-in' value='-x'>
-        </p>
-
-        <p>
-            Snake colour: <input type="color" id='color' value='#f15689'>
-        </p>
 
         <script>
 
@@ -50,11 +129,16 @@
 
             const cvs = document.querySelector('canvas')
 
-            cvs.width = 600
-            cvs.height = 600
+            cvs.width = 800
+            cvs.height = 800
             const ctx = cvs.getContext('2d')
 
-            let scale = 1
+            let scale = 2
+
+            document.querySelector('#scale').addEventListener('input', e => {
+                // Parsing the input after forcing it to a string is a hack that seems to fix issues?
+                scale = parseFloat(`${e.target.value}`)
+            })
 
             let points = []
             let transPoints = []
@@ -140,33 +224,62 @@
                     transPoints[i][1] += (transTargets[i][1] - transPoints[i][1]) * 0.05
                 }
 
+                for(let x = 0; x < cvs.width / 2; x += (cvs.width/2 / scale)){
+                    ctx.lineWidth = 1
+                    ctx.strokeStyle = '#ccc'
+                    ctx.beginPath()
+                    ctx.moveTo(cvs.width / 2 + x, 0)
+                    ctx.lineTo(cvs.width / 2 + x, cvs.width)
+                    ctx.moveTo(cvs.width / 2 - x, 0)
+                    ctx.lineTo(cvs.width / 2 - x, cvs.width)
+                    ctx.moveTo(0, cvs.width / 2 + x)
+                    ctx.lineTo(cvs.width, cvs.width / 2 + x)
+                    ctx.moveTo(0, cvs.width / 2 - x)
+                    ctx.lineTo(cvs.width, cvs.width / 2 - x)
+                    ctx.stroke()
+                }
+
                 ctx.lineWidth = 2
                 ctx.lineCap = 'round'
-                ctx.strokeStyle = '#ddd'
+                ctx.strokeStyle = '#aaa'
                 ctx.beginPath()
                 ctx.moveTo(0, cvs.width/2)
                 ctx.lineTo(cvs.width, cvs.width/2)
-                ctx.stroke()
-                ctx.beginPath()
                 ctx.moveTo(cvs.width/2, 0)
                 ctx.lineTo(cvs.width/2, cvs.width)
                 ctx.stroke()
+                ctx.beginPath()
+                ctx.arc(cvs.width/2, cvs.height/2, cvs.width / (scale*2), 0, Math.PI * 2)
+                ctx.stroke()
 
-                function drawSnake(points, color){
-                    for(let i = 1; i < points.length; i++){
-                        let prev = points[i - 1]
-                        let curr = points[i]
+                function drawSnake(snakePoints, color, shouldRainbow = false){
+
+                    const showWinding = document.querySelector('#winding').checked
+                    if(!showWinding) shouldRainbow = false
+
+                    let tipCol = null
+
+                    // Draw the actual snake body
+                    for(let i = 1; i < snakePoints.length; i++){
+                        let prev = snakePoints[i - 1]
+                        let curr = snakePoints[i]
                         ctx.strokeStyle = color
-                        ctx.lineWidth = Math.round(map(i-1, 0, points.length, 20, 3))
+                        ctx.lineWidth = Math.round(map(i-1, 0, points.length, 15, 3))
+                        if(shouldRainbow && (transPoints.length > 0)){
+                            const ang = Math.atan2(transPoints[i][0], transPoints[i][1])
+                            ctx.strokeStyle = `hsl(${ang * 180 / Math.PI}, 60%, 55%)`
+                        }
+                        if(tipCol == null) tipCol = ctx.strokeStyle
                         ctx.beginPath()
                         ctx.moveTo(map(prev[0], -scale, scale, 0, cvs.width), map(prev[1], scale, -scale, 0, cvs.width))
                         ctx.lineTo(map(curr[0], -scale, scale, 0, cvs.width), map(curr[1], scale, -scale, 0, cvs.width))
                         ctx.stroke()
                     }
 
-                    if(points.length < 2) return
-                    let startPoint = points[0].map(x => map(x, -scale, scale, 0, cvs.width))
-                    let secondPoint = points[1].map(x => map(x, -scale, scale, 0, cvs.width))
+                    // Draw eyes and stuff, yes it's long, no I don't know what I'm doing...
+                    if(snakePoints.length < 2) return
+                    let startPoint = snakePoints[0].map(x => map(x, -scale, scale, 0, cvs.width))
+                    let secondPoint = snakePoints[1].map(x => map(x, -scale, scale, 0, cvs.width))
                     startPoint[1] = cvs.width - startPoint[1]
                     secondPoint[1] = cvs.width - secondPoint[1]
                     const dx = secondPoint[0] - startPoint[0]
@@ -174,6 +287,7 @@
                     const ang = -Math.atan2(dy, dx)
                     const tang = Math.atan2(dy, dx)
                     ctx.lineWidth = 3
+                    ctx.strokeStyle = tipCol
                     ctx.beginPath()
                     let len = 15
                     let tipX = startPoint[0] - Math.cos(tang) * len
@@ -187,13 +301,17 @@
                     ctx.stroke()
                     ctx.fillStyle = '#fff'
                     ctx.beginPath()
-                    ctx.arc(startPoint[0] + Math.sin(ang) * 5, startPoint[1] + Math.cos(ang) * 5, 4, 0, Math.PI * 2)
-                    ctx.arc(startPoint[0] - Math.sin(ang) * 5, startPoint[1] - Math.cos(ang) * 5, 4, 0, Math.PI * 2)
+                    ctx.arc(startPoint[0] + Math.sin(ang) * 5, startPoint[1] + Math.cos(ang) * 4, 3, 0, Math.PI * 2)
+                    ctx.arc(startPoint[0] - Math.sin(ang) * 5, startPoint[1] - Math.cos(ang) * 4, 3, 0, Math.PI * 2)
                     ctx.fill()
                 }
 
-                drawSnake(points, '#333')
-                drawSnake(transPoints, document.querySelector('#color').value)
+                drawSnake([...transPoints].reverse(), document.querySelector('#color').value)
+                drawSnake([...points].reverse(), '#555', true)
+
+                ctx.fillStyle = '#000'
+                ctx.font = '20px Quicksand'
+                ctx.fillText(50, 50, document.querySelector('#func-in').value)
 
                 requestAnimationFrame(render)
             }
